@@ -38,6 +38,7 @@ def t(topic):
     else:
         raise Exception(topic)
 
+
 class Pupil_LSL_Relay(Plugin):
     """Plugin to relay Pupil Capture data to LSL
 
