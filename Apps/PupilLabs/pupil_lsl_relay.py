@@ -23,9 +23,13 @@ import pylsl as lsl
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
-NOTIFY_SUB_TOPIC = b'notify.'
-PUPIL_SUB_TOPIC = b'pupil.'
-GAZE_SUB_TOPIC = b'gaze'
+NOTIFY_SUB_TOPIC = 'notify.'
+PUPIL_SUB_TOPIC = 'pupil.'
+GAZE_SUB_TOPIC = 'gaze'
+
+
+def t(topic):
+    return "b'%s'" % topic
 
 
 class Pupil_LSL_Relay(Plugin):
@@ -87,9 +91,9 @@ class Pupil_LSL_Relay(Plugin):
         def make_setter(sub_topic, attribute_name):
             def set_value(value):
                 setattr(self, attribute_name, value)
-                cmd = b'Subscribe' if value else b'Unsubscribe'
-                self.thread_pipe.send(cmd, flags=zmq.SNDMORE)
-                self.thread_pipe.send(sub_topic)
+                cmd = 'Subscribe' if value else 'Unsubscribe'
+                self.thread_pipe.send_string(cmd, flags=zmq.SNDMORE)
+                self.thread_pipe.send_string(sub_topic)
             return set_value
 
         help_str = ('Pupil LSL Relay subscribes to the Pupil ZMQ Backbone'
@@ -129,7 +133,7 @@ class Pupil_LSL_Relay(Plugin):
 
     def shutdown_thread_loop(self):
         if self.thread_pipe:
-            self.thread_pipe.send('Exit')
+            self.thread_pipe.send_string('Exit')
             while self.thread_pipe:
                 sleep(.1)
 
@@ -173,7 +177,8 @@ class Pupil_LSL_Relay(Plugin):
 
                 if inlet.socket in items:
                     topic, payload = inlet.recv()
-                    if topic.startswith(PUPIL_SUB_TOPIC) and pupil_outlets:
+                    if (topic.startswith(t(PUPIL_SUB_TOPIC))
+                            and pupil_outlets):
                         eyeid = payload['id']
                         # push primitive sample
                         outlet = pupil_outlets[eyeid*2]
@@ -184,7 +189,8 @@ class Pupil_LSL_Relay(Plugin):
                         outlet.push_sample((repr(payload),))
                         del outlet  # delete reference
 
-                    elif topic.startswith(GAZE_SUB_TOPIC) and gaze_outlets:
+                    elif (topic.startswith(t(GAZE_SUB_TOPIC))
+                          and gaze_outlets):
                         # push primitive sample
                         outlet = gaze_outlets[0]
                         sample = self._generate_primitive_sample(payload)
@@ -194,7 +200,7 @@ class Pupil_LSL_Relay(Plugin):
                         outlet.push_sample((repr(payload),))
                         del outlet  # delete reference
 
-                    elif (topic.startswith(NOTIFY_SUB_TOPIC)
+                    elif (topic.startswith(t(NOTIFY_SUB_TOPIC))
                           and notification_outlet):
                         sample = (payload['subject'], repr(payload))
                         notification_outlet.push_sample(sample)
@@ -204,10 +210,10 @@ class Pupil_LSL_Relay(Plugin):
 
                 if pipe in items:
                     cmd = pipe.recv()
-                    if cmd == b'Exit':
+                    if cmd == 'Exit':
                         break
 
-                    elif cmd == b'Subscribe':
+                    elif cmd == 'Subscribe':
                         topic = pipe.recv()
                         inlet.subscribe(topic)
                         if topic == PUPIL_SUB_TOPIC and not pupil_outlets:
@@ -219,7 +225,7 @@ class Pupil_LSL_Relay(Plugin):
                             notification_outlet = self._create_notify_lsl_outlet()
                         logger.debug('Subscribed to "%s"' % topic)
 
-                    elif cmd == b'Unsubscribe':
+                    elif cmd == 'Unsubscribe':
                         topic = pipe.recv()
                         inlet.unsubscribe(topic)
                         if topic == PUPIL_SUB_TOPIC and pupil_outlets:
