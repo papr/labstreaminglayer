@@ -23,9 +23,9 @@ import pylsl as lsl
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
-NOTIFY_SUB_TOPIC = 'notify.'
-PUPIL_SUB_TOPIC = 'pupil.'
-GAZE_SUB_TOPIC = 'gaze'
+NOTIFY_SUB_TOPIC = b'notify.'
+PUPIL_SUB_TOPIC = b'pupil.'
+GAZE_SUB_TOPIC = b'gaze'
 
 
 class Pupil_LSL_Relay(Plugin):
@@ -87,9 +87,9 @@ class Pupil_LSL_Relay(Plugin):
         def make_setter(sub_topic, attribute_name):
             def set_value(value):
                 setattr(self, attribute_name, value)
-                cmd = 'Subscribe' if value else 'Unsubscribe'
-                self.thread_pipe.send_string(cmd, flags=zmq.SNDMORE)
-                self.thread_pipe.send_string(sub_topic)
+                cmd = b'Subscribe' if value else b'Unsubscribe'
+                self.thread_pipe.send(cmd, flags=zmq.SNDMORE)
+                self.thread_pipe.send(sub_topic)
             return set_value
 
         help_str = ('Pupil LSL Relay subscribes to the Pupil ZMQ Backbone'
@@ -129,7 +129,7 @@ class Pupil_LSL_Relay(Plugin):
 
     def shutdown_thread_loop(self):
         if self.thread_pipe:
-            self.thread_pipe.send_string('Exit')
+            self.thread_pipe.send('Exit')
             while self.thread_pipe:
                 sleep(.1)
 
@@ -204,10 +204,10 @@ class Pupil_LSL_Relay(Plugin):
 
                 if pipe in items:
                     cmd = pipe.recv()
-                    if cmd == 'Exit':
+                    if cmd == b'Exit':
                         break
 
-                    elif cmd == 'Subscribe':
+                    elif cmd == b'Subscribe':
                         topic = pipe.recv()
                         inlet.subscribe(topic)
                         if topic == PUPIL_SUB_TOPIC and not pupil_outlets:
@@ -219,7 +219,7 @@ class Pupil_LSL_Relay(Plugin):
                             notification_outlet = self._create_notify_lsl_outlet()
                         logger.debug('Subscribed to "%s"' % topic)
 
-                    elif cmd == 'Unsubscribe':
+                    elif cmd == b'Unsubscribe':
                         topic = pipe.recv()
                         inlet.unsubscribe(topic)
                         if topic == PUPIL_SUB_TOPIC and pupil_outlets:
