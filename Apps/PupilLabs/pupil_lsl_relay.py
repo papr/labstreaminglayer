@@ -21,7 +21,7 @@ from pyglui import ui
 import pylsl as lsl
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+logging.getLogger().setLevel(logging.DEBUG)
 
 NOTIFY_SUB_TOPIC = 'notify.'
 PUPIL_SUB_TOPIC = 'pupil.'
@@ -29,8 +29,14 @@ GAZE_SUB_TOPIC = 'gaze'
 
 
 def t(topic):
-    return "b'%s'" % topic
-
+    if isinstance(topic, bytes):
+        return topic.decode()
+    elif topic.startswith("b'"):
+        return topic[2:-1]
+    elif isinstance(topic, str):
+        return topic
+    else:
+        raise Exception(topic)
 
 class Pupil_LSL_Relay(Plugin):
     """Plugin to relay Pupil Capture data to LSL
@@ -177,7 +183,8 @@ class Pupil_LSL_Relay(Plugin):
 
                 if inlet.socket in items:
                     topic, payload = inlet.recv()
-                    if (topic.startswith(t(PUPIL_SUB_TOPIC))
+                    topic = t(topic)
+                    if (topic.startswith(PUPIL_SUB_TOPIC)
                             and pupil_outlets):
                         eyeid = payload['id']
                         # push primitive sample
@@ -189,7 +196,7 @@ class Pupil_LSL_Relay(Plugin):
                         outlet.push_sample((repr(payload),))
                         del outlet  # delete reference
 
-                    elif (topic.startswith(t(GAZE_SUB_TOPIC))
+                    elif (topic.startswith(GAZE_SUB_TOPIC)
                           and gaze_outlets):
                         # push primitive sample
                         outlet = gaze_outlets[0]
@@ -200,7 +207,7 @@ class Pupil_LSL_Relay(Plugin):
                         outlet.push_sample((repr(payload),))
                         del outlet  # delete reference
 
-                    elif (topic.startswith(t(NOTIFY_SUB_TOPIC))
+                    elif (topic.startswith(NOTIFY_SUB_TOPIC)
                           and notification_outlet):
                         sample = (payload['subject'], repr(payload))
                         notification_outlet.push_sample(sample)
@@ -209,12 +216,12 @@ class Pupil_LSL_Relay(Plugin):
                         logger.debug('Did not handle topic "%s"' % topic)
 
                 if pipe in items:
-                    cmd = pipe.recv()
+                    cmd = t(pipe.recv())
                     if cmd == 'Exit':
                         break
 
                     elif cmd == 'Subscribe':
-                        topic = pipe.recv()
+                        topic = t(pipe.recv())
                         inlet.subscribe(topic)
                         if topic == PUPIL_SUB_TOPIC and not pupil_outlets:
                             pupil_outlets = self._create_pupil_lsl_outlets()
@@ -226,7 +233,7 @@ class Pupil_LSL_Relay(Plugin):
                         logger.debug('Subscribed to "%s"' % topic)
 
                     elif cmd == 'Unsubscribe':
-                        topic = pipe.recv()
+                        topic = t(pipe.recv())
                         inlet.unsubscribe(topic)
                         if topic == PUPIL_SUB_TOPIC and pupil_outlets:
                             pupil_outlets = None
@@ -235,6 +242,8 @@ class Pupil_LSL_Relay(Plugin):
                         elif topic == NOTIFY_SUB_TOPIC and notification_outlet:
                             notification_outlet = None
                         logger.debug('Unubscribed from "%s"' % topic)
+                    else:
+                        logger.warning('unoprocessed cmd: %s' % cmd)
 
         except Exception as e:
             logger.error('Error during relaying data to LSL. '
