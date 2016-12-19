@@ -88,7 +88,8 @@ class Pupil_LSL_Relay(Plugin):
             def set_value(value):
                 setattr(self, attribute_name, value)
                 cmd = 'Subscribe' if value else 'Unsubscribe'
-                self.thread_pipe.send_multipart([cmd, sub_topic])
+                self.thread_pipe.send_string(cmd, flags=zmq.SNDMORE)
+                self.thread_pipe.send_string(sub_topic)
             return set_value
 
         help_str = ('Pupil LSL Relay subscribes to the Pupil ZMQ Backbone'
@@ -128,7 +129,7 @@ class Pupil_LSL_Relay(Plugin):
 
     def shutdown_thread_loop(self):
         if self.thread_pipe:
-            self.thread_pipe.send('Exit')
+            self.thread_pipe.send_string('Exit')
             while self.thread_pipe:
                 sleep(.1)
 
